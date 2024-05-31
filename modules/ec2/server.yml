@@ -1,0 +1,79 @@
+#cloud-config
+write_files: 
+  - path: /run/myserver/api_demo.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      # map HTTP header API-ID to a HTTP header named host_dynamic
+      map $http_api_id $host_dynamic {
+	      use2api1   	api1;
+	      use2api2  	api2;
+	      default	  	default;
+      }
+
+      server {
+	      listen 8001;
+	      server_name use2api1;
+				default_type html;
+	      return 200 "You have reached the US-EAST-2 API-1 API.\n
+		    Info:
+		      Server Address:\t\t\t $server_addr:$server_port\n
+		      API-ID Header:\t $http_api_id
+		      Host Header:\t\t\t $host
+		      Request URI:\t\t\t $request_uri
+		      Served by NGINX Plus $nginx_version\n";
+      }
+
+      server {
+	      listen 8002;
+	      server_name use2api2;
+				default_type html;
+	      return 200 "You have reached the US-EAST-2 API-2 API.\n
+		    Info:
+		      Server Address:\t\t\t $server_addr:$server_port\n
+		      API-ID Header:\t $http_api_id
+		      Host Header:\t\t\t $host
+		      Request URI:\t\t\t $request_uri
+		      Served by NGINX Plus $nginx_version\n";
+      }
+
+      server {
+	      listen 8000;
+	      server_name default;
+				default_type html;
+	      return 200 "You have reached the US-EAST-2 API Server. Please specify a API-ID header to reach an API.\n
+		    Info:
+		      Server Address:\t\t\t $server_addr:$server_port\n
+		      API-ID Header:\t $http_api_id
+		      Service-Version Header:\t\t $http_service_version\n
+		      Host Header:\t\t\t $host
+		      Request URI:\t\t\t $request_uri
+		      Served by NGINX Plus $nginx_version\n";
+	    }
+
+      upstream api1 {
+	      server 127.0.0.1:8001;
+      }
+
+      upstream api2 {
+	      server 127.0.0.1:8002;
+      }
+
+      upstream default {
+	      server 127.0.0.1:8000;
+      }
+
+      server {
+	      listen 80 default;
+	      location / {
+		      proxy_pass http://$host_dynamic/;
+		      proxy_set_header Host $host_dynamic;
+		      proxy_set_header X-Forwarded-For $remote_addr;
+	      }
+      }
+
+runcmd:
+  - yum install -y nginx
+  - mv /run/myserver/api_demo.conf /etc/nginx/conf.d/api_demo.conf
+  - systemctl enable --no-block nginx 
+  - systemctl start --no-block nginx 
